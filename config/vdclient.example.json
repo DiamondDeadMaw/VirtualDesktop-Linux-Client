@@ -1,0 +1,73 @@
+{
+  "_comment": [
+    "Copy to config/vdclient.json and edit. Every value here is the default,",
+    "so an empty object {} behaves identically. Keys starting with _ or $ are",
+    "ignored. Environment overrides use VDCLIENT_<SECTION>_<KEY>, e.g.",
+    "VDCLIENT_VIDEO_FPS=72."
+  ],
+
+  "identity": {
+    "_comment": "What the Quest sees in its computer list.",
+    "name": "Linux Test PC",
+    "description": "Virtual Desktop (Linux)",
+
+    "_streamer_version": "Version-gated by the app; must be close enough to the installed streamer to pass its update checks.",
+    "streamer_version": "1.34.22.0",
+
+    "_os_name": "Must be 'Windows' or 'MacOS'. Anything else makes the Quest's deserializer throw and silently drop this computer from the list.",
+    "os_name": "Windows",
+    "region": "AmericaWest",
+
+    "allow_remote_connections": false,
+    "encrypt_local_traffic": true,
+    "encrypt_remote_traffic": true,
+
+    "_adapters": "Advertised in PrivateAdapters. The Quest derives our real address from the UDP reply's source, so this is mostly cosmetic.",
+    "adapter_mac": "02:00:00:00:00:01",
+    "adapter_wireless": true,
+    "adapter_gigabit": true
+  },
+
+  "video": {
+    "enabled": true,
+
+    "_size": "null = detect the primary output and align down to a multiple of 16. An explicit value must already be a multiple of 16, or the encoder pads and signals a crop the Quest's decoder may ignore, leaving a black bar along one edge.",
+    "width": null,
+    "height": null,
+
+    "fps": 60,
+
+    "_encoder": "'h264_vaapi' (Intel iGPU) or 'libx264' (software). VAAPI falls back to software automatically if no render node is found or the encode probe fails.",
+    "encoder": "h264_vaapi",
+
+    "_source": "'auto', 'test' (pattern), 'x11', 'kmsgrab', 'kms'. 'auto' picks x11 when an X server is running, then upgrades a single full-screen monitor to zero-copy kmsgrab when ffmpeg has CAP_SYS_ADMIN.",
+    "source": "auto",
+
+    "_monitors": [
+      "One entry per monitor, at most 3 (the Quest configures 3 decoders).",
+      "  null                  -> the full primary screen",
+      "  [x, y, w, h]          -> a capture region of the primary screen",
+      "  {\"virtual\": true}     -> a genuine extra monitor",
+      "  {\"virtual\": {\"width\": 1920, \"height\": 1080}}",
+      "Examples:",
+      "  [null]                            one monitor, full screen (default)",
+      "  [null, {\"virtual\": true}]         real screen + one virtual monitor",
+      "  [[0,0,1920,1080], [1920,0,1920,1080]]   two real side-by-side outputs",
+      "All monitors encode at the same width/height; per-monitor bounds only",
+      "place the screens in 3D."
+    ],
+    "monitors": [null]
+  },
+
+  "tunables": {
+    "_comment": "Timings and buffer sizes. Change only with a reason.",
+    "video_send_timeout": 5.0,
+    "video_queue_size": 256,
+    "idle_hold_seconds": 3600.0
+  },
+
+  "logging": {
+    "level": "INFO",
+    "timestamps": true
+  }
+}

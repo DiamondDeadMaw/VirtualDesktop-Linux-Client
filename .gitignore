@@ -21,3 +21,4 @@ native/build.log
 # dev tools
 src/vdclient/tools/
 tests/test_capture_probe.py
+docs/

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vdclient"
+version = "1.0.0"
+description = "Virtual Desktop Linux streamer: impersonates a Windows PC for the Meta Quest app"
+requires-python = ">=3.10"
+dependencies = [
+    "pycryptodome>=3.19",
+]
+
+[project.optional-dependencies]
+# Only needed to build native/ (the pybind11 encoder module).
+native = ["pybind11>=2.11", "setuptools>=64"]
+dev = ["pytest>=7.4"]
+
+[project.scripts]
+vdclient = "vdclient.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "hardware: requires a real display, GPU or ffmpeg on this machine",
+]
