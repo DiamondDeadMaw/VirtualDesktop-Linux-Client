@@ -1,0 +1,37 @@
+# TEMPLATE. __ROOT_DIR__ and __USER__ are substituted by scripts/setup.sh when it
+# installs this to /etc/systemd/system/vdclient.service. Installing this file
+# as-is will not work -- run the setup script, or substitute both yourself.
+
+[Unit]
+Description=Virtual Desktop Linux client (Quest streamer)
+After=network-online.target graphical.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# The streamer captures the seat's X session, so it must run as the desktop
+# user, not root.
+User=__USER__
+WorkingDirectory=__ROOT_DIR__
+
+# No --config: the search path already covers config/vdclient.json in the
+# working directory, then ~/.config/vdclient/, then /etc/vdclient/.
+ExecStart=__ROOT_DIR__/.venv/bin/python3 -m vdclient
+
+# DISPLAY and XAUTHORITY are auto-detected (see display/xsession.py), so they are
+# not set here on purpose: hardcoding them breaks whenever the session changes.
+
+Restart=on-failure
+RestartSec=5
+
+# The four session ports plus discovery are all above 1024, so no capabilities
+# are needed here. kmsgrab's CAP_SYS_ADMIN lives on the ffmpeg / vd_encoder
+# binary instead -- see scripts/setup.sh.
+NoNewPrivileges=false
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=graphical.target

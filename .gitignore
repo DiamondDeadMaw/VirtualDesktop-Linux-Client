@@ -1,0 +1,23 @@
+__pycache__/
+*.pyc
+.venv/
+.agents/
+*.egg-info/
+build/
+dist/
+
+# Local configuration (config/vdclient.example.json is the tracked template)
+config/vdclient.json
+
+# Native build output
+native/vd_encoder
+native/build/
+native/*.so
+
+# Native build log
+native/build.log
+
+
+# dev tools
+src/vdclient/tools/
+tests/test_capture_probe.py

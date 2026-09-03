@@ -1,0 +1,6 @@
+# These run on Linux. A CRLF shebang fails as: /usr/bin/env: 'bash\r': No such
+# file or directory -- so force LF regardless of the editing platform.
+*.sh text eol=lf
+*.service text eol=lf
+Makefile text eol=lf
+*.py text eol=lf
