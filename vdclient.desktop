@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Virtual Desktop Client
+Comment=Start Virtual Desktop Linux Client
+Exec=bash -c "cd \"$(dirname \"$1\")\" && .venv/bin/python3 -m vdclient" _ %k
+Terminal=true
+Icon=utilities-terminal
+Categories=Utility;

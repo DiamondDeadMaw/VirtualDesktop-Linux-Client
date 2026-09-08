@@ -36,11 +36,9 @@ if [ "$ASSUME_YES" = "1" ] && [ "$CHECK_ONLY" = "1" ]; then
 fi
 
 ask() {
-    # ask "prompt" -> 0 (yes) or 1 (no). Defaults to YES: this is an installer,
-    # and a bare Enter silently skipping the step is how you end up with a
-    # half-provisioned box and no idea why.
+    # default yes so enter doesn't skip installs
     if [ "$CHECK_ONLY" = "1" ]; then
-        return 1   # --check installs nothing; decline every offer silently
+        return 1
     fi
     if [ "$ASSUME_YES" = "1" ]; then
         echo "$1 [Y/n] y"
@@ -69,7 +67,6 @@ pkg_install() {
 BUILD_LOG="$ROOT_DIR/native/build.log"
 
 step() {
-    # step "message" cmd... -- run quietly, print one line, show the tail on error.
     local msg="$1"; shift
     printf '  %-38s' "$msg..."
     if "$@" >>"$BUILD_LOG" 2>&1; then
@@ -93,7 +90,6 @@ build_vd_encoder() {
 }
 
 check_cmd() {
-    # check_cmd <human name> <command> <package> [optional=1]
     local name="$1" cmd="$2" pkg="$3" optional="${4:-0}"
     if command -v "$cmd" >/dev/null 2>&1; then
         echo "$name Exists, OK."
@@ -126,7 +122,7 @@ else
     if ask "Install python3 now?"; then
         pkg_install python3 python3-venv python3-pip
     elif [ "$CHECK_ONLY" = "1" ]; then
-        :   # --check never bails early; the report below says what is missing
+        :   # let the report show missing items
     else
         echo "Nothing else here can proceed without it."
         exit 1
@@ -186,44 +182,58 @@ VAAPI_DEV=""
 for d in /dev/dri/renderD128 /dev/dri/renderD129 /dev/dri/card0; do
     [ -e "$d" ] && VAAPI_DEV="$d" && break
 done
+
+va_encode_works() {
+    local drv="${1:-}"
+    [ -z "$VAAPI_DEV" ] || ! command -v ffmpeg >/dev/null 2>&1 && return 1
+    if [ -n "$drv" ]; then
+        env LIBVA_DRIVER_NAME="$drv" ffmpeg -hide_banner -loglevel error \
+            -f lavfi -i testsrc=size=320x240:rate=1 -frames:v 1 \
+            -vaapi_device "$VAAPI_DEV" -vf format=nv12,hwupload \
+            -c:v h264_vaapi -profile:v main -f null - >/dev/null 2>&1
+    else
+        ffmpeg -hide_banner -loglevel error \
+            -f lavfi -i testsrc=size=320x240:rate=1 -frames:v 1 \
+            -vaapi_device "$VAAPI_DEV" -vf format=nv12,hwupload \
+            -c:v h264_vaapi -profile:v main -f null - >/dev/null 2>&1
+    fi
+}
+
 if [ -z "$VAAPI_DEV" ]; then
     echo "No /dev/dri render device found -- no supported iGPU, or the driver isn't"
     echo "loaded. The streamer falls back to software encoding automatically."
 else
     echo "$VAAPI_DEV Exists, OK."
-    # Two gotchas on older Intel iGPUs (Broadwell/HD 5xxx):
-    #  1. The default iHD driver (intel-media-driver) is DECODE-ONLY there -- it
-    #     exposes no H.264 encode entrypoint ("No usable encoding entrypoint
-    #     found"). The legacy i965 driver provides the encoder, which is why
-    #     vdclient.hardware forces LIBVA_DRIVER_NAME=i965.
-    #  2. The base i965-va-driver package ships WITHOUT the encode shader
-    #     kernels, so h264_vaapi aborts inside the driver ("i965_encoder.c:
-    #     Assertion `encoder_context->mfc_context' failed"). Those shaders live
-    #     in i965-va-driver-shaders (non-free/multiverse).
-    I965_DRV=""
-    for d in /usr/lib/x86_64-linux-gnu/dri/i965_drv_video.so \
-             /usr/lib/dri/i965_drv_video.so /usr/lib64/dri/i965_drv_video.so; do
-        [ -e "$d" ] && I965_DRV="$d" && break
-    done
-    if [ -z "$I965_DRV" ]; then
-        echo "i965 VAAPI driver is missing (needed for hardware H.264 ENCODE on older"
-        echo "Intel iGPUs; the default iHD driver only decodes on those chips)."
-        if ask "Install i965-va-driver-shaders (driver + encode shaders) now?"; then
-            pkg_install i965-va-driver-shaders
-        else
-            echo "Skipping -- hardware encoding will fall back to software."
-        fi
-    elif command -v dpkg >/dev/null 2>&1 && \
-         ! dpkg -s i965-va-driver-shaders >/dev/null 2>&1; then
-        echo "i965 VAAPI driver Exists, OK. (but the encode shaders look missing)"
-        echo "Without them h264_vaapi aborts with an mfc_context assertion."
-        if ask "Install i965-va-driver-shaders now?"; then
-            pkg_install i965-va-driver-shaders
-        else
-            echo "Skipping -- hardware encoding will fall back to software."
-        fi
+    # older intel igpus need i965-va-driver-shaders bc ihd is decode-only and base i965 lacks encode shaders
+    if va_encode_works ""; then
+        echo "VAAPI H.264 encode Exists, OK. (default driver)"
+    elif va_encode_works "i965"; then
+        echo "VAAPI H.264 encode Exists, OK. (i965 driver)"
     else
-        echo "i965 VAAPI driver + encode shaders Exist, OK."
+        I965_DRV=""
+        for d in /usr/lib/x86_64-linux-gnu/dri/i965_drv_video.so \
+                 /usr/lib/dri/i965_drv_video.so /usr/lib64/dri/i965_drv_video.so; do
+            [ -e "$d" ] && I965_DRV="$d" && break
+        done
+        if [ -z "$I965_DRV" ]; then
+            echo "VAAPI encode failed with default driver, and i965 driver is missing."
+            if ask "Install i965-va-driver-shaders (driver + encode shaders) now?"; then
+                pkg_install i965-va-driver-shaders
+            else
+                echo "Skipping -- hardware encoding will fall back to software."
+            fi
+        elif command -v dpkg >/dev/null 2>&1 && \
+             ! dpkg -s i965-va-driver-shaders >/dev/null 2>&1; then
+            echo "i965 VAAPI driver Exists, OK. (but the encode shaders look missing)"
+            echo "Without them h264_vaapi aborts with an mfc_context assertion."
+            if ask "Install i965-va-driver-shaders now?"; then
+                pkg_install i965-va-driver-shaders
+            else
+                echo "Skipping -- hardware encoding will fall back to software."
+            fi
+        else
+            echo "Hardware H.264 encode unavailable -- will fall back to software."
+        fi
     fi
     if [ -r "$VAAPI_DEV" ] && [ -w "$VAAPI_DEV" ]; then
         echo "Permission to use $VAAPI_DEV Exists, OK."
@@ -271,8 +281,6 @@ if [ -x "$VENV_PY" ]; then
         step "Installing pybind11" "$VENV_PY" -m pip install -q pybind11
         step "Building native module" build_native_module
         step "Building vd_encoder" build_vd_encoder
-        # setcap needs root. sudo prompts on the tty, so it stays visible even
-        # though the command's own output goes to the log.
         step "Granting vd_encoder cap_sys_admin" \
             sudo setcap cap_sys_admin+ep "$ROOT_DIR/native/vd_encoder"
     else
@@ -341,9 +349,6 @@ else
 fi
 
 # --- readiness report ------------------------------------------------------
-# Verify what is actually in place. An install step that printed no error is not
-# evidence that it worked -- a failed compile or a failed setcap otherwise
-# surfaces days later as "no cursor in the stream".
 if [ -t 1 ]; then
     C_OK=$'\033[32m'; C_WARN=$'\033[33m'; C_BAD=$'\033[31m'
     C_DIM=$'\033[2m'; C_OFF=$'\033[0m'
@@ -355,8 +360,6 @@ MISSING_ESSENTIAL=0
 MISSING_OPTIONAL=0
 
 row() {
-    # row <ok|no> <essential|optional> <label> <detail> [fix command]
-    # A row that is not OK always prints the command that fixes it.
     local state="$1" kind="$2" label="$3" detail="$4" fix="${5:-}"
     if [ "$state" = "ok" ]; then
         printf '  [ %sOK%s ]  %-22s %s%s%s\n' "$C_OK" "$C_OFF" "$label" "$C_DIM" "$detail" "$C_OFF"
@@ -418,17 +421,14 @@ else
     row no optional "VAAPI device" "$VAAPI_DEV not writable -- join the 'render' group" "sudo usermod -aG render $(whoami)   # then log out and back in"
 fi
 
-I965=""
-for d in /usr/lib/x86_64-linux-gnu/dri/i965_drv_video.so /usr/lib/dri/i965_drv_video.so \
-         /usr/lib64/dri/i965_drv_video.so; do
-    [ -e "$d" ] && I965="$d" && break
-done
-if [ -z "$I965" ]; then
-    row no optional "i965 VAAPI driver" "missing -- hardware H.264 encode unavailable" "sudo apt install i965-va-driver-shaders"
-elif have dpkg && ! dpkg -s i965-va-driver-shaders >/dev/null 2>&1; then
-    row no optional "i965 VAAPI driver" "present but encode shaders look missing" "sudo apt install i965-va-driver-shaders"
+if [ -z "$VAAPI_DEV" ]; then
+    :
+elif va_encode_works ""; then
+    row ok optional "VAAPI driver" "H.264 encode supported (default driver)"
+elif va_encode_works "i965"; then
+    row ok optional "VAAPI driver" "H.264 encode supported (i965 driver)"
 else
-    row ok optional "i965 VAAPI driver" "driver + encode shaders"
+    row no optional "VAAPI driver" "hardware H.264 encode unavailable" "sudo apt install i965-va-driver-shaders"
 fi
 
 if have ffmpeg && have getcap && \

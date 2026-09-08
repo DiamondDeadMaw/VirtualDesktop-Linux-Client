@@ -14,9 +14,6 @@ NativeEncoder::NativeEncoder(const std::string &display, std::tuple<int, int, in
     : out_width_(out_width), out_height_(out_height) {
     auto [x, y, w, h] = region;
 
-    // default iHD driver is decode-only on broadwell, force i965 for encode
-    setenv("LIBVA_DRIVER_NAME", "i965", 0);
-
     drm_fd_ = open(vaapi_device.c_str(), O_RDWR);
     if (drm_fd_ < 0) {
         throw std::runtime_error("could not open " + vaapi_device);

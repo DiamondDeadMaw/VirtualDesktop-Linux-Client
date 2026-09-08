@@ -132,9 +132,6 @@ int main(int argc, char **argv) {
     Options opt;
     if (!parse_args(argc, argv, &opt)) return 2;
 
-    // default iHD driver is decode-only on broadwell, force i965 for encode
-    setenv("LIBVA_DRIVER_NAME", "i965", 0);
-
     // handle closed stdout via write() error rather than dying to SIGPIPE
     signal(SIGPIPE, SIG_IGN);
 

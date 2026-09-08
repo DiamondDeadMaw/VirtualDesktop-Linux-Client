@@ -1,10 +1,18 @@
-# Virtual Desktop — Linux Client
+# Virtual Desktop Streamer for Linux
 
-Streams the Linux desktop to a Meta Quest running Virtual Desktop by emulating the Windows streamer protocol.
-
+Streams a Linux machines desktop to the Quest 3 via Virtual Desktop. 
 ---
 
-Not implemented: audio output, mouse/keyboard input injection, switching active monitors (for dual monitor setups)
+Not implemented: audio output, mouse/keyboard input injection, switching active monitors (for dual monitor setups).
+
+# Compatibility
+Will work with hardware encoding on broadwell and haswell cpus (i5-4xxx, i5-5xxx, i7-4xxxx).
+Skylake and up MAY use hardware (untested) otherwise will fall back to software.
+Amd gpus not supported.
+Non- debian distros will fail setup.
+Non x11 window environments will fail.
+Desktops cannot add new monitors.
+No GPU support at all. 
 
 ## Requirements
 

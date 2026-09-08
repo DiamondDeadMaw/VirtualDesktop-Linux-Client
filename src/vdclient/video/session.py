@@ -106,6 +106,9 @@ class VideoSession:
         self.encoder, self.vaapi_device, self.vaapi_env = encoders.select_encoder(self.encoder)
 
         self.base_env, self.base_display = xsession.base_environment(self.base_source)
+        if "LIBVA_DRIVER_NAME" in self.vaapi_env:
+            self.base_env["LIBVA_DRIVER_NAME"] = self.vaapi_env["LIBVA_DRIVER_NAME"]
+            os.environ["LIBVA_DRIVER_NAME"] = self.vaapi_env["LIBVA_DRIVER_NAME"]
         if self.base_source == "test" and len(video.monitors) > 1:
             log.info("[video] note: no X display, using distinct TEST patterns per monitor")
 
@@ -210,8 +213,8 @@ class VideoSession:
                                   crtc_id=plan.get("crtc_id"))
         log.info("[video] monitor %d: %s", index, " ".join(cmd))
         env = plan["env"]
-        if self.encoder == "h264_vaapi" and "LIBVA_DRIVER_NAME" not in env:
-            env = dict(env, LIBVA_DRIVER_NAME=encoders.hardware.LIBVA_DRIVER)
+        if self.encoder == "h264_vaapi" and "LIBVA_DRIVER_NAME" in self.vaapi_env and "LIBVA_DRIVER_NAME" not in env:
+            env = dict(env, LIBVA_DRIVER_NAME=self.vaapi_env["LIBVA_DRIVER_NAME"])
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 bufsize=0, env=env)
         self._register(proc)

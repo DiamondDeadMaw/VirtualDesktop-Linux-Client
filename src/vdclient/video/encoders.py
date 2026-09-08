@@ -30,9 +30,7 @@ def vaapi_device() -> str | None:
 
 
 def vaapi_environment() -> dict:
-    env = os.environ.copy()
-    env.setdefault("LIBVA_DRIVER_NAME", hardware.LIBVA_DRIVER)
-    return env
+    return os.environ.copy()
 
 
 def vaapi_encode_works(device: str, env: dict) -> bool:
@@ -172,14 +170,25 @@ def select_encoder(requested: str) -> tuple[str, str | None, dict]:
                  "falling back to software libx264")
         return "libx264", None, env
 
-    if vaapi_encode_works(device, env):
-        log.info("[video] hardware encoding via VAAPI on %s (driver=%s)",
-                 device, env["LIBVA_DRIVER_NAME"])
-        return "h264_vaapi", device, env
+    if "LIBVA_DRIVER_NAME" in env:
+        if vaapi_encode_works(device, env):
+            log.info("[video] hardware encoding via VAAPI on %s (driver=%s)",
+                     device, env["LIBVA_DRIVER_NAME"])
+            return "h264_vaapi", device, env
+    else:
+        # try default driver first, then fall back to i965 for older intel igpus
+        if vaapi_encode_works(device, env):
+            log.info("[video] hardware encoding via VAAPI on %s (default driver)", device)
+            return "h264_vaapi", device, env
+
+        fallback_env = dict(env, LIBVA_DRIVER_NAME=hardware.LIBVA_DRIVER)
+        if vaapi_encode_works(device, fallback_env):
+            log.info("[video] hardware encoding via VAAPI on %s (driver=%s)",
+                     device, hardware.LIBVA_DRIVER)
+            return "h264_vaapi", device, fallback_env
 
     log.info("[video] VAAPI is present but hardware H.264 encode is not usable on this "
-             "GPU/driver (known issue on older Intel iGPUs) -- falling back to "
-             "software libx264")
+             "GPU/driver -- falling back to software libx264")
     return "libx264", None, env
 
 

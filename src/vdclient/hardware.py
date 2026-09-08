@@ -5,7 +5,7 @@ Machine: i5 5500u
 from __future__ import annotations
 
 # --- VAAPI ---------------------------------------------------------------
-# iHD driver has no encoding
+# fallback driver for older intel igpus where ihd has no encode
 LIBVA_DRIVER = "i965"
 
 VAAPI_DEVICE_CANDIDATES = ("/dev/dri/renderD128", "/dev/dri/renderD129", "/dev/dri/card0")
