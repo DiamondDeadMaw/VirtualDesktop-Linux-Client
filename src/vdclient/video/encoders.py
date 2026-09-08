@@ -130,8 +130,10 @@ def ffmpeg_cmd(source, region, index, width, height, fps, encoder, display,
     common = ["ffmpeg", "-hide_banner", "-loglevel", "warning"] + \
         input_args(source, region, index, width, height, fps, display,
                    kms_device=kms_device, crtc_id=crtc_id)
-    scale = f"scale={width}:{height}"
+    scale = f"scale={width}:{height}:out_color_matrix=bt709:out_range=limited"
     zerocopy = source in ("kmsgrab", "kms")
+    vui = ["-color_primaries", "bt709", "-color_trc", "bt709",
+           "-colorspace", "bt709", "-color_range", "tv"]
 
     if encoder == "h264_vaapi" and zerocopy:
         # derive_device sets the vaapi device, setting -vaapi_device conflicts
@@ -139,21 +141,23 @@ def ffmpeg_cmd(source, region, index, width, height, fps, encoder, display,
         if region is not None:
             x, y, w, h = region
             filters.append(f"crop={w}:{h}:{x}:{y}")
-        filters.append(f"scale_vaapi=w={width}:h={height}:format=nv12")
+        filters.append(f"scale_vaapi=w={width}:h={height}:format=nv12"
+                       ":out_color_matrix=bt709:out_range=limited")
         enc = ["-vf", ",".join(filters), "-c:v", "h264_vaapi",
                "-profile:v", hardware.VAAPI_PROFILE,
-               "-aud", "1", "-g", str(fps), "-bf", "0"]
+               "-aud", "1", "-g", str(fps), "-bf", "0"] + vui
     elif encoder == "h264_vaapi":
-        vf = f"hwupload,scale_vaapi=w={width}:h={height}:format=nv12"
+        vf = (f"hwupload,scale_vaapi=w={width}:h={height}:format=nv12"
+              ":out_color_matrix=bt709:out_range=limited")
         enc = ["-vaapi_device", device or hardware.DEFAULT_VAAPI_DEVICE, "-vf", vf,
                "-c:v", "h264_vaapi", "-profile:v", hardware.VAAPI_PROFILE,
-               "-aud", "1", "-g", str(fps), "-bf", "0"]
+               "-aud", "1", "-g", str(fps), "-bf", "0"] + vui
     else:
         vf = ",".join([scale, "format=yuv420p"])
         enc = ["-vf", vf, "-c:v", "libx264", "-profile:v", "baseline",
                "-preset", "ultrafast", "-tune", "zerolatency",
                "-x264-params",
-               f"aud=1:repeat-headers=1:keyint={fps}:min-keyint={fps}:scenecut=0"]
+               f"aud=1:repeat-headers=1:keyint={fps}:min-keyint={fps}:scenecut=0"] + vui
 
     return common + enc + ["-f", "h264", "-"]
 
